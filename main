@@ -1,0 +1,200 @@
+terraform {
+required_version = "1.4.6"
+required_providers {
+    aws ={
+        source = "hashicorp/aws"
+        version = ">= 4.0"
+    }
+  } 
+}
+provider "aws" {
+    region = "us-east-1"
+    profile = "default"
+  
+}
+#vpc
+resource "aws_vpc" "myvpc" {
+    cidr_block = "10.0.0.0/16"
+    tags={
+        "name"="3-tier-vpc"
+    }
+  
+}
+#subnets for each az1
+resource "aws_subnet" "publicsubnet1" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.1.0/24"
+    availability_zone = "us-east-1a"
+    map_public_ip_on_launch = true
+    tags = {
+      "name"="publicsubnet1"
+    }
+}
+resource "aws_subnet" "publicsubnet2" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.2.0/24"
+    availability_zone = "us-east-1b"
+    map_public_ip_on_launch = true
+    tags = {
+      "name"="publicsubnet2"
+    }
+}
+resource "aws_subnet" "privatesubnet1" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.7.0/24"
+    availability_zone = "us-east-1a"
+    tags = {
+      "name"="privatesubnet1"
+    }
+}
+resource "aws_subnet" "privatesubnet2" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.4.0/24"
+    availability_zone = "us-east-1b"
+    tags = {
+      "name"="privatesubnet2"
+    }
+}
+resource "aws_subnet" "dbprivatesubnet1" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.5.0/24"
+    availability_zone = "us-east-1a"
+    tags = {
+        "name"="dbprivatesubnet1"
+    } 
+}
+resource "aws_subnet" "dbprivatesubnet2" {
+    vpc_id = aws_vpc.myvpc.id
+    cidr_block = "10.0.6.0/24"
+    availability_zone = "us-east-1b"
+    tags = {
+      "names"="dbprivatesubnet2"
+    }
+}
+#create internet gateway
+resource "aws_internet_gateway" "tier3_igw" {
+  vpc_id = aws_vpc.myvpc.id
+  tags = {
+    "name"="3_tier_igw"
+  }
+}
+#create route table and add public route
+resource "aws_route_table" "public_route_table" {
+  vpc_id       = aws_vpc.myvpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.tier3_igw.id
+  }
+
+  tags       = {
+    Name     ="public_rt" 
+  }
+}
+
+#associate public subnet1 to "public route table"
+resource "aws_route_table_association" "publicsubnet1_routetable_association" {
+  subnet_id           = aws_subnet.publicsubnet1.id
+  route_table_id      = aws_route_table.public_route_table.id
+}
+
+#associate public subnet2 to "public route table"
+resource "aws_route_table_association" "publicsubnet2_routetable_association" {
+  subnet_id           = aws_subnet.publicsubnet2.id
+  route_table_id      = aws_route_table.public_route_table.id
+}
+#create security grouop
+resource "aws_security_group" "tier3_security_group" {
+  tags = {
+    "name"="tier3_sg"
+  }
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+#create instances for us-east 1a
+resource "aws_instance" "public_instance1" {
+  ami           = "ami-0c101f26f147fa7fd"
+  instance_type = "t2.micro"
+  key_name      = "mykey"
+  tags = {
+    Name = "public_instance1"
+  }
+}
+resource "aws_instance" "private_instance1" {
+  ami           = "ami-0c101f26f147fa7fd"  
+  instance_type = "t2.micro"      
+  key_name      = "mykey"
+  associate_public_ip_address = false  
+  tags = {
+    Name = "private_instance1"
+  }
+}
+resource "aws_instance" "database_instance1" {
+  ami           = "ami-0c101f26f147fa7fd"  
+  instance_type = "t2.micro"     
+  key_name      = "mykey"
+  associate_public_ip_address = false
+  tags = {
+    Name = "database_instance1"
+  }
+}
+#create instances for us-east 1b
+resource "aws_instance" "public_instance2" {
+  ami           = "ami-0c101f26f147fa7fd"
+  instance_type = "t2.micro"
+  key_name      = "mykey"
+  tags = {
+    Name = "public_instance2"
+  }
+}
+resource "aws_instance" "private_instance2" {
+  ami           = "ami-0c101f26f147fa7fd"  
+  instance_type = "t2.micro"      
+  key_name      = "mykey"
+  associate_public_ip_address = false  
+  tags = {
+    Name = "private_instance2"
+  }
+}
+resource "aws_instance" "database_instance2" {
+  ami           = "ami-0c101f26f147fa7fd"  
+  instance_type = "t2.micro"     
+  key_name      = "mykey"
+  associate_public_ip_address = false
+  tags = {
+    Name = "database_instance2"
+  }
+}
+# Create Launch Configuration
+resource "aws_launch_configuration" "tier3_lc" {
+  name          = "tier3_launch_config"
+  image_id      = "ami-0c101f26f147fa7fd"
+  instance_type = "t2.micro"
+}
+
+# Create Auto Scaling Group
+resource "aws_autoscaling_group" "tier3_secgrp" {
+  name                 = "tier3_secgrp"
+  launch_configuration = aws_launch_configuration.tier3_lc.id
+  min_size             = 1
+  max_size             = 3
+  desired_capacity     = 2
+  vpc_zone_identifier  = ["aws_subnet.privatesubnet1", "aws_subnet.privatesubnet2"] 
+}
