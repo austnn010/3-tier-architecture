@@ -1,0 +1,20 @@
+The infrastructure setup involves the following steps:
+
+VPC Creation:
+
+Creates a Virtual Private Cloud (VPC) with the desired CIDR block.
+Subnet Creation:
+
+Sets up subnets across two availability zones:
+Public subnet: for the presentation layer.
+Private subnet: for the application and database layers.
+Database subnet: specifically for hosting the database instances.
+EC2 Instance Deployment:
+
+Launches EC2 instances in the public and private subnets across two availability zones:
+Public subnet: for hosting the presentation layer.
+Private subnet: for hosting the application layer.
+Database subnet: for hosting the database layer.
+Autoscaling Group Setup:
+
+Configures an autoscaling group specifically for the EC2 instances in the private subnets to ensure high availability and scalability of the application layer.
